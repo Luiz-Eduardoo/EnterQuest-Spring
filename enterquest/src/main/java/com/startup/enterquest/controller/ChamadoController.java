@@ -54,17 +54,22 @@ public ResponseEntity<?> atualizarStatusChamado(
 
     try {
         String novoStatus = body.get("status");
+        String idTecnico = body.get("idTecnico");
 
-        boolean atualizado = chamadoService.atualizarStatusChamado(idChamado, novoStatus);
+        boolean atualizado = chamadoService.atualizarStatusChamado(
+                idChamado,
+                novoStatus,
+                idTecnico
+        );
 
         if (!atualizado) {
-            return ResponseEntity.badRequest().body("Status inválido");
+            return ResponseEntity.badRequest().body("Status inválido ou chamado não encontrado");
         }
 
         return ResponseEntity.ok("Status atualizado com sucesso!");
 
     } catch (Exception e) {
-        return ResponseEntity.status(500).body("Erro ao atualizar status");
+        return ResponseEntity.status(500).body("Erro ao atualizar status: " + e.getMessage());
     }
 }
 @GetMapping("/dashboard")

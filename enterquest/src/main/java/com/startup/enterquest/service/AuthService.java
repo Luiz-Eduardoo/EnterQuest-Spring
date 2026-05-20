@@ -250,6 +250,7 @@ public boolean criarUsuario(CriarUsuarioRequest request) throws Exception {
     usuario.setLogin(request.getLogin());
     usuario.setEmail(request.getEmail());
     usuario.setCargo(request.getCargo());
+    usuario.setPontos(0);
     usuario.setSenha(passwordEncoder.encode(request.getSenha()));
     usuario.setPrimeiroAcesso(true);
 

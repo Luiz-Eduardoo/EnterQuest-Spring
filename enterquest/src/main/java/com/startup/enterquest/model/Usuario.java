@@ -8,6 +8,7 @@ public class Usuario {
     private String login;
     private String senha;
     private String cargo;
+    private int pontos;
     private Boolean primeiroAcesso;
     
 
@@ -34,6 +35,10 @@ public class Usuario {
         return cargo;
     }
 
+    public int getPontos() {
+    return pontos;
+    }
+
     public void setId(String id) {
         this.id = id;
     }
@@ -52,6 +57,10 @@ public class Usuario {
 
     public void setCargo(String cargo) {
         this.cargo = cargo;
+    }
+    
+    public void setPontos(int pontos) {
+    this.pontos = pontos;
     }
 
     public Boolean getPrimeiroAcesso() {

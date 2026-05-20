@@ -9,15 +9,27 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.google.firebase.cloud.FirestoreClient;
 import com.startup.enterquest.model.Chamado;
+import com.startup.enterquest.model.ConfiguracaoGamificacao;
 import com.startup.enterquest.model.DashboardResumo;
 import com.startup.enterquest.util.ValidadorEntrada;
 
 @Service
 public class ChamadoService {
+
+    private final GamificacaoService gamificacaoService;
+private final NotificacaoEmailService notificacaoEmailService;
+
+public ChamadoService(
+        GamificacaoService gamificacaoService,
+        NotificacaoEmailService notificacaoEmailService) {
+    this.gamificacaoService = gamificacaoService;
+    this.notificacaoEmailService = notificacaoEmailService;
+}
     
 
     public String criarChamado(Chamado chamado) throws Exception {
@@ -42,6 +54,23 @@ public class ChamadoService {
         chamado.setId(id);
 
         banco.collection("chamados").document(id).set(chamado).get();
+       DocumentSnapshot documentoUsuario = banco.collection("usuarios")
+        .document(chamado.getIdUsuario())
+        .get()
+        .get();
+
+if (documentoUsuario.exists()) {
+    String cargoUsuario = documentoUsuario.getString("cargo");
+
+    if ("FUNCIONARIO".equals(cargoUsuario)) {
+        ConfiguracaoGamificacao configuracao = gamificacaoService.buscarConfiguracao();
+
+        gamificacaoService.adicionarPontosUsuario(
+                chamado.getIdUsuario(),
+                configuracao.getPontosAbrirChamado()
+        );
+    }
+} 
 
         return "Chamado aberto com sucesso!";
     }
@@ -90,7 +119,7 @@ public List<Chamado> listarChamadosPorUsuario(String idUsuario) throws Exception
     return chamados;
 }
 
-public boolean atualizarStatusChamado(String idChamado, String novoStatus) throws Exception {
+public boolean atualizarStatusChamado(String idChamado, String novoStatus, String idTecnico) throws Exception {
 
     Firestore banco = FirestoreClient.getFirestore();
 
@@ -98,17 +127,61 @@ public boolean atualizarStatusChamado(String idChamado, String novoStatus) throw
         return false;
     }
 
+    DocumentSnapshot documentoChamado = banco.collection("chamados")
+            .document(idChamado)
+            .get()
+            .get();
+
+    if (!documentoChamado.exists()) {
+        return false;
+    }
+
+    Chamado chamadoAtual = documentoChamado.toObject(Chamado.class);
+
+    if (chamadoAtual == null) {
+        return false;
+    }
+
+    String statusAnterior = chamadoAtual.getStatus();
+    boolean statusFoiAlterado = !novoStatus.equals(statusAnterior);
+
     Map<String, Object> atualizacoes = new HashMap<>();
     atualizacoes.put("status", novoStatus);
 
-    if (novoStatus.equals("Concluído")) {
+    if ("Concluído".equals(novoStatus) && !"Concluído".equals(statusAnterior)) {
         atualizacoes.put("dataEncerramento", LocalDateTime.now().toString());
+
+        ConfiguracaoGamificacao configuracao = gamificacaoService.buscarConfiguracao();
+
+        gamificacaoService.adicionarPontosUsuario(
+                idTecnico,
+                configuracao.getPontosConcluirChamado()
+        );
     }
 
     banco.collection("chamados")
             .document(idChamado)
             .update(atualizacoes)
             .get();
+
+            if (statusFoiAlterado) {
+    DocumentSnapshot documentoUsuario = banco.collection("usuarios")
+            .document(chamadoAtual.getIdUsuario())
+            .get()
+            .get();
+
+    if (documentoUsuario.exists()) {
+        String emailUsuario = documentoUsuario.getString("email");
+
+        if (emailUsuario != null && !emailUsuario.trim().isEmpty()) {
+            notificacaoEmailService.enviarEmailAtualizacaoChamado(
+                    emailUsuario,
+                    chamadoAtual.getTitulo(),
+                    novoStatus
+            );
+        }
+    }
+}
 
     return true;
 }
@@ -263,4 +336,5 @@ public DashboardResumo gerarResumoDashboard() throws Exception {
 
     return resumo;
 }
+
 }
